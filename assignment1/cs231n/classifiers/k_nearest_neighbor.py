@@ -133,6 +133,7 @@ class KNearestNeighbor(object):
         dists += np.sum(X ** 2, axis =1).reshape(num_test, 1)
         dists += np.sum(self.X_train **2, axis = 1).reshape(num_train, 1).T
         dists -= 2 * X.dot(self.X_train.T)
+        dists = np.sqrt(dists)
         #dists = np.sum(X ** 2, axis = 1) + np.sum(self.X_train ** 2, axis = 0).T - 2 * X.dot(self.X_train.T)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
