@@ -78,10 +78,17 @@ class TwoLayerNet(object):
         # Store the result in the scores variable, which should be an array of      #
         # shape (N, C).                                                             #
         #############################################################################
-        # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****        
+        extendedInput = np.hstack((X, np.ones((N, 1))))
+        
+        extendedW1 = np.vstack((W1, b1.reshape(1, -1)))
+        
+        firstScore = np.maximum(0, np.dot(extendedInput, extendedW1))                          
+        extendedFirstScore = np.hstack((firstScore, np.ones((N, 1))))
+        extendedW2 = np.vstack((W2, b2.reshape(1, -1)))
+        
+        scores = np.dot(extendedFirstScore, extendedW2)
+        
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         # If the targets are not given then jump out, we're done
@@ -97,8 +104,13 @@ class TwoLayerNet(object):
         # classifier loss.                                                          #
         #############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
+        
+        softmax = np.exp(scores[np.arange(N), y])  / np.sum(np.exp(scores), axis = 1)
+        loss = np.sum(-np.log(softmax)) / N
+        
+        L2_reg = reg * (np.sum(W1 * W1) + np.sum(W2 * W2))
+        
+        loss += L2_reg
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -110,8 +122,27 @@ class TwoLayerNet(object):
         # grads['W1'] should store the gradient on W1, and be a matrix of same size #
         #############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        '''
+        ds = scores_exp / np.sum(scores_exp, axis = 1).reshape(-1, 1)
+        ds[range(num_train), list(y)] -= 1
+        dW = (X.T).dot(ds)
+        '''
+        
+        ds2 = np.exp(scores) / np.sum(np.exp(scores), axis = 1).reshape(-1, 1)
+        ds2[range(ds2.shape[0]), list(y)] -= 1
+        ds2 /= N
+        
+        #print('firstScore : ', firstScore.shape)
+        #print('ds2 : ', ds2.shape)
+        
+        grads['W2'] = firstScore.T.dot(ds2) + reg * 2 * W2
+        #print(grads['W2'].shape)
+        
+        temp  = ds2.dot(W2.T)
+        temp[firstScore <= 0] = 0
+        grads['W1'] = X.T.dot(temp) + reg * 2 * W1
+        #print(grads['W1'].shape)
 
-        pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -155,8 +186,9 @@ class TwoLayerNet(object):
             # them in X_batch and y_batch respectively.                             #
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-            pass
+            batch_index = np.random.choice(num_train, batch_size, replace=True)
+            X_batch = X[batch_index]
+            y_batch = y[batch_index]
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -172,7 +204,8 @@ class TwoLayerNet(object):
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-            pass
+            self.params['W1'] -= learning_rate * grads['W1']
+            self.params['W2'] -= learning_rate * grads['W2']
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -218,8 +251,10 @@ class TwoLayerNet(object):
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
-
+        score1 = X.dot(self.params['W1'])
+        score2 = score1.dot(self.params['W2'])
+        y_pred = np.argmax(score2, axis = 1)                     
+                       
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         return y_pred
