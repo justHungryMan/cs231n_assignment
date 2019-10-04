@@ -265,9 +265,10 @@ class FullyConnectedNet(object):
         # 일단 batch, dropout 안쓸때
         
         now_layer = X
+        cache = {}
         for index in range(self.num_layers - 1):
-            now_layer, self.params['cache%d' % (index + 1)] = affine_relu_forward(now_layer, self.params['W%d' % (index + 1)], self.params['b%d' % (index + 1)])
-        scores, self.params['cache%d' % (self.num_layers)], = affine_forward(now_layer, self.params['W%d' % (self.num_layers)], self.params['b%d' % (self.num_layers)])
+            now_layer, cache['%d' % (index + 1)] = affine_relu_forward(now_layer, self.params['W%d' % (index + 1)], self.params['b%d' % (index + 1)])
+        scores, cache['%d' % (self.num_layers)] = affine_forward(now_layer, self.params['W%d' % (self.num_layers)], self.params['b%d' % (self.num_layers)])
         
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -299,13 +300,17 @@ class FullyConnectedNet(object):
 
 
         for index in range(self.num_layers):
-            loss += 0.5 * self.reg * np.sum(self.params['W%d' % (index + 1)])
-        now_determinant, grads['W%d' % (self.num_layers)], grads['b%d' %(self.num_layers)] = affine_backward(now_determinant, self.params['cache%d' % (self.num_layers)])
+            loss += 0.5 * self.reg * np.sum(self.params['W%d' % (index + 1)] ** 2)
+        now_determinant, grads['W%d' % (self.num_layers)], grads['b%d' %(self.num_layers)] = affine_backward(now_determinant, cache['%d' % (self.num_layers)])
         
         for index in range(self.num_layers - 1):
             weight_index = self.num_layers - index - 1
-            now_determinant, grads['W%d' % (weight_index)], grads['b%d' % (weight_index)] = affine_relu_backward(now_determinant, self.params['cache%d' % (weight_index)])
+            now_determinant, grads['W%d' % (weight_index)], grads['b%d' % (weight_index)] = affine_relu_backward(now_determinant, cache['%d' % (weight_index)])
         
+        for index in range(self.num_layers):
+            grads['W%d' % (index + 1)] += self.reg * self.params['W%d' % (index + 1)]
+            
+       
         
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
