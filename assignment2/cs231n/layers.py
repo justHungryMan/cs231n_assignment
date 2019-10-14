@@ -197,17 +197,55 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # might prove to be helpful.                                          #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        mean = np.mean(x, axis = 0)
-        var = np.var(x, axis = 0)
-        x_norm = (x - mean) / np.sqrt(var + eps)
-        out = gamma * x_norm + beta
         
-        cache = (mean, var, x_norm, gamma)
+        # x : N * D
         
-        running_mean = (1 - momentum) * mean + momentum * running_mean
-        running_var = (1 - momentum) * var + momentum * running_var
+        #d_x += 1 / N * np.ones(N, D) * d_x_mean
+        x_mean = np.mean(x, axis = 0)
+        #d_x = d_x_minus
+        #d_x_mean = -1. * np.sum(d_x_minus, axis = 0)
+        x_minus = x - x_mean 
+        #d_x_minus += 2 * x_minus * d_minus_square
+        x_minus_square = x_minus ** 2
+        
+        #d_minus_square = 1 / N * np.ones(N, D) * d_x_minus_square_mean
+        x_minus_square_mean = np.mean(x_minus_square, axis = 0)
+        #d_x_minus_square_mean = d_x_minus_square_mean_root * 1 / (2 * (x_minus_square_mean + epos) ** 0.5)
+        x_minus_square_mean_root = (x_minus_square_mean + eps) ** (0.5)
+        #d_x_minus_square_mean_root = d_x_minus_square_mean_root_denominator * (-1. / x_minus_square_mean_root ** 2)
+        x_minus_square_mean_root_denominator = 1./ x_minus_square_mean_root
+        #d_x_minus = x_minus_square_mean_root_denominator * d_norm
+        #d_x_minus_square_mean_root_denominator = np.sum(x_minus * d_norm, 0)
+        x_norm = x_minus * x_minus_square_mean_root_denominator
+        #d_norm = gamma * d_gamma_x_norm
+        #d_gamma = np.sum(x_norm * d_gamma_x_norm, axis = 0)
+        gamma_x_norm = gamma * x_norm
+        #d_gamma_x_norm = dout
+        #d_beta = np.sum(dout, axis = 0)
+        gamma_x_norm_plus_beta = gamma_x_norm + beta
+        
+        out = gamma_x_norm_plus_beta
+        
+        # need : 
+        
+        cache = (gamma, beta, eps, x_norm, x_minus, x_minus_square_mean_root_denominator, x_minus_square_mean_root, x_minus_square_mean, x_minus)
+        
+        running_mean = (1 - momentum) * x_mean + momentum * running_mean
+        running_var = (1 - momentum) * x_minus_square_mean + momentum * running_var
+    
+        '''
+        mu_B = np.sum(x, axis=0) / N
+        sigma_square_B = np.sum(np.square(x - mu_B), axis=0) / N
+        x_bar = (x - mu_B) / np.sqrt(sigma_square_B + eps)
+        y = gamma * x_bar + beta
 
+        out = y
+        running_mean = momentum * running_mean + (1 - momentum) * mu_B
+        running_var = momentum * running_var + (1 - momentum) * sigma_square_B
+        cache = (x_bar, gamma, sigma_square_B, eps, mu_B, x)
+        '''
+        
+        
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
         #                           END OF YOUR CODE                          #
@@ -263,11 +301,35 @@ def batchnorm_backward(dout, cache):
     # might prove to be helpful.                                              #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-    mean, var, x_norm, gamma = cache
-    dbeta = np.sum(dout, axis = 0)
-    dgamma = np.sum(dout * x_norm, axis = 0)
-    dx = gamma * dout
+    
+    N, D = dout.shape
+    
+    gamma, beta, eps, x_norm, x_minus, x_minus_square_mean_root_denominator, x_minus_square_mean_root, x_minus_square_mean, x_minus = cache
+    
+    d_gamma_x_norm = dout
+    d_beta = np.sum(dout, axis = 0)
+    
+    d_norm = gamma * d_gamma_x_norm
+    d_gamma = np.sum(x_norm * d_gamma_x_norm, axis = 0)
+    
+    d_x_minus = x_minus_square_mean_root_denominator * d_norm
+    d_x_minus_square_mean_root_denominator = np.sum(x_minus * d_norm, 0)
+    
+    d_x_minus_square_mean_root = d_x_minus_square_mean_root_denominator * (-1. / x_minus_square_mean_root ** 2)
 
+    d_x_minus_square_mean = d_x_minus_square_mean_root * 1 / (2 * (x_minus_square_mean + eps) ** 0.5)
+
+    d_minus_square = 1 / N * np.ones((N, D)) * d_x_minus_square_mean
+
+    d_x_minus += 2 * x_minus * d_minus_square
+
+    d_x = d_x_minus
+    d_x_mean = -1. * np.sum(d_x_minus, axis = 0)
+    
+    d_x += 1 / N * np.ones((N, D)) * d_x_mean
+    
+    dx, dgamma, dbeta = d_x, d_gamma, d_beta
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -302,6 +364,7 @@ def batchnorm_backward_alt(dout, cache):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     mean, var, x_norm, gamma = cache
+    
     dbeta = np.sum(dout, axis = 0)
     dgamma = np.sum(dout * x_norm, axis = 0)
     dx = gamma * dout
@@ -443,8 +506,9 @@ def dropout_forward(x, dropout_param):
         # Store the dropout mask in the mask variable.                        #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
+        mask = (np.random.rand(*x.shape) < p) / p
+        out = x * mask
+        
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -456,7 +520,7 @@ def dropout_forward(x, dropout_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        out = x
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -487,7 +551,7 @@ def dropout_backward(dout, cache):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        dx = dout * mask
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -495,6 +559,7 @@ def dropout_backward(dout, cache):
         #######################################################################
     elif mode == 'test':
         dx = dout
+    
     return dx
 
 

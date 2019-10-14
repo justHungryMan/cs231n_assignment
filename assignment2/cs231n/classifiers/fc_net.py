@@ -197,6 +197,7 @@ class FullyConnectedNet(object):
             if self.normalization is not None:
                 self.params['gamma%d' % (index + 1)] = np.ones(element)
                 self.params['beta%d' % (index + 1)] = np.zeros(element)
+
         self.params['W%d' %(self.num_layers)] = np.random.normal(scale = weight_scale, size = (prior_layer_dim, num_classes))
         self.params['b%d' %(self.num_layers)] = np.zeros(num_classes)
         
@@ -266,9 +267,20 @@ class FullyConnectedNet(object):
         
         now_layer = X
         cache = {}
+        dropout_cache = {}
         for index in range(self.num_layers - 1):
-            now_layer, cache['%d' % (index + 1)] = affine_relu_forward(now_layer, self.params['W%d' % (index + 1)], self.params['b%d' % (index + 1)])
+            if self.normalization == 'batchnorm':
+                now_layer, cache['%d' % (index + 1)] = affine_batchnorm_relu_forward(now_layer, self.params['W%d' % (index + 1)], self.params['b%d' % (index + 1)], self.params['gamma%d' % (index + 1)], self.params['beta%d' % (index + 1)], self.bn_params[index])
+            else :
+                now_layer, cache['%d' % (index + 1)] = affine_relu_forward(now_layer, self.params['W%d' % (index + 1)], self.params['b%d' % (index + 1)])
+            
+            if self.use_dropout:
+                now_layer, dropout_cache['%d' %(index + 1)] = dropout_forward(now_layer, self.dropout_param)
+                
         scores, cache['%d' % (self.num_layers)] = affine_forward(now_layer, self.params['W%d' % (self.num_layers)], self.params['b%d' % (self.num_layers)])
+        
+        
+            
         
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -305,13 +317,20 @@ class FullyConnectedNet(object):
         
         for index in range(self.num_layers - 1):
             weight_index = self.num_layers - index - 1
-            now_determinant, grads['W%d' % (weight_index)], grads['b%d' % (weight_index)] = affine_relu_backward(now_determinant, cache['%d' % (weight_index)])
+            if self.use_dropout:
+                now_determinant = dropout_backward(now_determinant, dropout_cache['%d' % weight_index])
+            
+            if self.normalization == "batchnorm":
+                 now_determinant, grads['W%d' % (weight_index)], grads['b%d' % (weight_index)], grads['gamma%d' % (weight_index)], grads['beta%d' % (weight_index)] = affine_batchnorm_relu_backward(now_determinant, cache['%d' % (weight_index)])
+            else :
+                now_determinant, grads['W%d' % (weight_index)], grads['b%d' % (weight_index)] = affine_relu_backward(now_determinant, cache['%d' % (weight_index)])
         
         for index in range(self.num_layers):
             grads['W%d' % (index + 1)] += self.reg * self.params['W%d' % (index + 1)]
             
+            
        
-        
+
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
